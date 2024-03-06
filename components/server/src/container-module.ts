@@ -132,6 +132,8 @@ import { ScmService } from "./scm/scm-service";
 import { ContextService } from "./workspace/context-service";
 import { RateLimitter } from "./rate-limitter";
 import { AnalyticsController } from "./analytics-controller";
+import { LazyIDEService } from "./ide-service-protocol";
+import { getPrimaryEmail } from "@gitpod/public-api-common/lib/user-utils";
 
 export const productionContainerModule = new ContainerModule(
     (bind, unbind, isBound, rebind, unbindAsync, onActivation, onDeactivation) => {
@@ -394,6 +396,16 @@ export const productionContainerModule = new ContainerModule(
                 },
             )
             .inSingletonScope();
+
+        bind<LazyIDEService>(LazyIDEService).toDynamicValue((ctx) => {
+            return {
+                getIDEConfig: async (userId) => {
+                    const user = await ctx.container.get(UserService).findUserById(userId, userId);
+                    const email = getPrimaryEmail(user);
+                    return ctx.container.get(IDEService).getIDEConfig({ user: { id: userId, email } });
+                },
+            };
+        });
 
         bind(RateLimitter).toSelf().inSingletonScope();
         bind(AnalyticsController).toSelf().inSingletonScope();

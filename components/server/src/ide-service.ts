@@ -5,7 +5,6 @@
  */
 
 import { IDESettings, User, Workspace } from "@gitpod/gitpod-protocol";
-import { IDEClient, IDEOptions } from "@gitpod/gitpod-protocol/lib/ide-protocol";
 import * as IdeServiceApi from "@gitpod/ide-service-api/lib/ide.pb";
 import {
     IDEServiceClient,
@@ -15,12 +14,8 @@ import {
 import { getPrimaryEmail } from "@gitpod/public-api-common/lib/user-utils";
 import { inject, injectable } from "inversify";
 import { AuthorizationService } from "./user/authorization-service";
+import type { IDEConfig } from "./ide-service-protocol";
 
-export interface IDEConfig {
-    supervisorImage: string;
-    ideOptions: IDEOptions;
-    clients?: { [id: string]: IDEClient };
-}
 @injectable()
 export class IDEService {
     @inject(IDEServiceDefinition.name)
@@ -81,6 +76,8 @@ export class IDEService {
         const workspaceType =
             workspace.type === "prebuild" ? IdeServiceApi.WorkspaceType.PREBUILD : IdeServiceApi.WorkspaceType.REGULAR;
 
+        // TODO: Decide and remove before merge
+        // We will do editor restriction check here if necessary
         const req: IdeServiceApi.ResolveWorkspaceConfigRequest = {
             type: workspaceType,
             context: JSON.stringify(workspace.context),

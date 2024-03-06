@@ -26,6 +26,7 @@ import { SupportedWorkspaceClass } from "@gitpod/gitpod-protocol/lib/workspace-c
 import { InstallationService } from "../auth/installation-service";
 import { getExperimentsClientForBackend } from "@gitpod/gitpod-protocol/lib/experiments/configcat-server";
 import { runWithSubjectId } from "../util/request-context";
+import { LazyIDEService } from "../ide-service-protocol";
 
 @injectable()
 export class OrganizationService {
@@ -37,6 +38,7 @@ export class OrganizationService {
         @inject(Authorizer) private readonly auth: Authorizer,
         @inject(IAnalyticsWriter) private readonly analytics: IAnalyticsWriter,
         @inject(InstallationService) private readonly installationService: InstallationService,
+        @inject(LazyIDEService) private readonly lazyIDEService: LazyIDEService,
         @inject(DefaultWorkspaceImageValidator)
         private readonly validateDefaultWorkspaceImage: DefaultWorkspaceImageValidator,
     ) {}
@@ -437,6 +439,27 @@ export class OrganizationService {
                 }
             }
         }
+        if (settings.restrictedEditorNames) {
+            if (settings.restrictedEditorNames.length > 0) {
+                const allEditors = await this.lazyIDEService
+                    .getIDEConfig(userId)
+                    .then((d) => Object.keys(d.ideOptions.options));
+                const notAllowedList = settings.restrictedEditorNames.filter((e) => !allEditors.includes(e as string));
+                if (notAllowedList.length > 0) {
+                    if (notAllowedList.length === 1) {
+                        throw new ApplicationError(
+                            ErrorCodes.BAD_REQUEST,
+                            `editor ${notAllowedList[0]} is not allowed in installation`,
+                        );
+                    } else {
+                        throw new ApplicationError(
+                            ErrorCodes.BAD_REQUEST,
+                            `editors ${notAllowedList.join(",")} are not allowed in installation`,
+                        );
+                    }
+                }
+            }
+        }
         return this.toSettings(await this.teamDB.setOrgSettings(orgId, settings));
     }
 
@@ -450,6 +473,9 @@ export class OrganizationService {
         }
         if (settings.allowedWorkspaceClasses) {
             result.allowedWorkspaceClasses = settings.allowedWorkspaceClasses;
+        }
+        if (settings.restrictedEditorNames) {
+            result.restrictedEditorNames = settings.restrictedEditorNames;
         }
         return result;
     }
